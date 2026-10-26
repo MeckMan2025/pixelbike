@@ -13,7 +13,9 @@ Play at [pixelbike.meckman.org](https://pixelbike.meckman.org).
 - **Start / continue:** Space
 - **Quit to title:** Esc
 
-A keyboard is required.
+### Phones and tablets
+
+Touch controls appear as soon as you touch the screen: a D-pad on the left (lanes and air tilt), TURBO and GAS on the right, and ✕ in the corner to quit. Tap anywhere else to start or continue. Slide a thumb between buttons without lifting it, for example from GAS to TURBO. Landscape gives the biggest view. On iPhone, turn off silent mode to hear the engine.
 
 ## The season
 

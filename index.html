@@ -3,15 +3,42 @@
 <head>
 <meta charset="utf-8">
 <title>Pixelbike</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Pixelbike: a retro motocross racer. Ten US city tracks, a points season, turbo with overheating, and a 450 thumper engine.">
 <style>
   html,body{margin:0;height:100%;background:#111;display:flex;align-items:center;justify-content:center}
   canvas{image-rendering:pixelated;background:#7ec8e3;width:min(100vw,177.78vh);height:auto}
+  /* touch controls: shown only after a touch, hidden again on any key press */
+  html,body{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+  #pad{display:none}
+  #pad.show{display:block}
+  .btn{position:fixed;display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+    font:bold 16px/1 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.38);border:2px solid rgba(255,255,255,.55);
+    border-radius:14px;-webkit-tap-highlight-color:transparent}
+  .btn.on{background:rgba(255,255,255,.4)}
+  .dpad{width:58px;height:58px;font-size:22px}
+  #bU{left:calc(env(safe-area-inset-left) + 74px);bottom:calc(env(safe-area-inset-bottom) + 136px)}
+  #bD{left:calc(env(safe-area-inset-left) + 74px);bottom:calc(env(safe-area-inset-bottom) + 12px)}
+  #bL{left:calc(env(safe-area-inset-left) + 12px);bottom:calc(env(safe-area-inset-bottom) + 74px)}
+  #bR{left:calc(env(safe-area-inset-left) + 136px);bottom:calc(env(safe-area-inset-bottom) + 74px)}
+  #bGas{right:calc(env(safe-area-inset-right) + 14px);bottom:calc(env(safe-area-inset-bottom) + 22px);width:96px;height:96px;border-radius:50%;font-size:20px;background:rgba(40,160,60,.45)}
+  #bTurbo{right:calc(env(safe-area-inset-right) + 122px);bottom:calc(env(safe-area-inset-bottom) + 70px);width:74px;height:74px;border-radius:50%;background:rgba(220,60,40,.45)}
+  #bGas.on{background:rgba(90,230,110,.7)} #bTurbo.on{background:rgba(255,110,80,.75)}
+  #bQuit{right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 10px);width:44px;height:44px;font-size:20px;border-radius:50%;display:none}
+  #bQuit.show{display:flex}
 </style>
 </head>
 <body>
 <canvas id="game" width="800" height="450"></canvas>
+<div id="pad">
+  <div class="btn dpad" id="bU" data-key="ArrowUp">&#9650;</div>
+  <div class="btn dpad" id="bD" data-key="ArrowDown">&#9660;</div>
+  <div class="btn dpad" id="bL" data-key="ArrowLeft">&#9664;</div>
+  <div class="btn dpad" id="bR" data-key="ArrowRight">&#9654;</div>
+  <div class="btn" id="bTurbo" data-key="KeyX">TURBO</div>
+  <div class="btn" id="bGas" data-key="KeyZ">GAS</div>
+  <div class="btn" id="bQuit" data-key="Escape">&#10005;</div>
+</div>
 <script>
 "use strict";
 const cvs = document.getElementById('game');
@@ -28,7 +55,48 @@ addEventListener('keydown', e => {
   if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });  // no stuck keys
+// Touch: each finger holds whichever button it is over, so a thumb can slide between buttons.
+// A tap anywhere that is not a button counts as Space (start, continue).
+let TOUCH = false;
+const pad = document.getElementById('pad'), quitBtn = document.getElementById('bQuit');
+const held = new Map(), holds = {};            // pointerId -> button, key -> fingers holding it
+function hold(btn, on) {
+  if (!btn) return;
+  const k = btn.dataset.key;
+  holds[k] = Math.max(0, (holds[k] || 0) + (on ? 1 : -1));
+  if (on && !keys[k]) tapped[k] = true;
+  keys[k] = holds[k] > 0;
+  btn.classList.toggle('on', keys[k]);
+}
+function btnAt(x, y) { const el = document.elementFromPoint(x, y); return el && el.dataset && el.dataset.key ? el : null; }
+addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse') return;
+  if (!TOUCH) { TOUCH = true; pad.classList.add('show'); }
+  audioInit();
+  const b = btnAt(e.clientX, e.clientY);
+  if (b) { held.set(e.pointerId, b); hold(b, true); } else tapped['Space'] = true;
+  e.preventDefault();
+}, { passive: false });
+addEventListener('pointermove', e => {
+  if (!held.has(e.pointerId)) return;
+  const b = btnAt(e.clientX, e.clientY), was = held.get(e.pointerId);
+  if (b && b !== was) { hold(was, false); hold(b, true); held.set(e.pointerId, b); }
+});
+function release(e) {
+  audioInit();                                 // iOS unlocks audio on touchend
+  if (!held.has(e.pointerId)) return;
+  hold(held.get(e.pointerId), false); held.delete(e.pointerId);
+}
+addEventListener('pointerup', release);
+addEventListener('pointercancel', release);
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', () => { if (TOUCH) { TOUCH = false; pad.classList.remove('show'); } });
+const go = () => TOUCH ? 'TAP' : 'SPACE';
+addEventListener('blur', () => {               // no stuck keys or buttons
+  for (const k in keys) keys[k] = false;
+  held.clear(); for (const k in holds) holds[k] = 0;
+  document.querySelectorAll('.btn.on').forEach(b => b.classList.remove('on'));
+});  // no stuck keys
 
 // ---------- game state ----------
 // TITLE -> CARD (round intro + standings) -> RACE -> FINISH -> CARD ... -> CHAMP
@@ -519,8 +587,8 @@ function titleScreen() {
   drawText('USA CIRCUIT', W / 2, 135, 5, '#c00000', 'center');
   drawText('10 CITIES  POINTS DECIDE THE CHAMPION', W / 2, 172, 2, '#000', 'center');
   if ((performance.now() / 500 | 0) % 2 === 0)          // blink the prompt
-    drawText('PRESS SPACE TO START THE SEASON', W / 2, 212, 3, '#000', 'center');
-  drawText('Z GAS  X TURBO  WATCH THE TEMP', W / 2, 262, 2, '#000', 'center');
+    drawText(TOUCH ? 'TAP TO START THE SEASON' : 'PRESS SPACE TO START THE SEASON', W / 2, 212, 3, '#000', 'center');
+  drawText(TOUCH ? 'GAS AND TURBO ON THE RIGHT  WATCH THE TEMP' : 'Z GAS  X TURBO  WATCH THE TEMP', W / 2, 262, 2, '#000', 'center');
   drawText('UP DOWN CHANGE LANES  DODGE THE MUD', W / 2, 284, 2, '#000', 'center');
   drawText('LEFT RIGHT TILT IN AIR', W / 2, 306, 2, '#000', 'center');
   drawText('LAND LEVEL WITH THE TRACK', W / 2, 328, 2, '#000', 'center');
@@ -560,7 +628,7 @@ function cardScreen() {                        // round intro: city, track map, 
   standingsTable(238, T.ink);
   drawText('POINTS  1ST 25  2ND 20  3RD 16  4TH 13  5TH 11', W / 2, 372, 2, T.ink, 'center');
   if ((performance.now() / 500 | 0) % 2 === 0)
-    drawText('SPACE TO RACE', W / 2, 406, 3, T.ink, 'center');
+    drawText(go() + ' TO RACE', W / 2, 406, 3, T.ink, 'center');
 }
 function champScreen() {                       // final standings with a podium
   ctx.fillStyle = '#141436';
@@ -579,7 +647,7 @@ function champScreen() {                       // final standings with a podium
   }
   standingsTable(258, '#aaa');
   if ((performance.now() / 500 | 0) % 2 === 0)
-    drawText('SPACE FOR A NEW SEASON', W / 2, 400, 3, '#fff', 'center');
+    drawText(go() + ' FOR A NEW SEASON', W / 2, 400, 3, '#fff', 'center');
 }
 function drawWorld() {
   const T = TRACK, ink = T.ink;
@@ -767,7 +835,7 @@ function finishScreen() {
     drawText('+' + r.pts, W / 2 + 170, 180 + i * 26, 2, c, 'right');
   });
   const last = round === TRACKS.length - 1;
-  drawText(last ? 'SPACE FOR THE FINAL STANDINGS' : 'SPACE FOR ROUND ' + (round + 2) + ': ' + TRACKS[round + 1].name,
+  drawText(last ? go() + ' FOR THE FINAL STANDINGS' : go() + ' FOR ROUND ' + (round + 2) + ': ' + TRACKS[round + 1].name,
            W / 2, 345, 2, '#fff', 'center');
 }
 
@@ -830,6 +898,7 @@ function frame(t) {
   lastT = t;
   update(dt);
   draw();
+  quitBtn.classList.toggle('show', TOUCH && state !== STATE.TITLE);
   requestAnimationFrame(frame);
 }
 loadTrack(0);
