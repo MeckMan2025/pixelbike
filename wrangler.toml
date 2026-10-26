@@ -1,0 +1,9 @@
+name = "pixelbike"
+compatibility_date = "2026-10-26"
+
+[assets]
+directory = "."
+
+[[routes]]
+pattern = "pixelbike.meckman.org"
+custom_domain = true
