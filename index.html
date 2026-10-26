@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <title>Pixelbike</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="description" content="Pixelbike: a retro motocross racer. Ten US city tracks, a points season, turbo with overheating, and a 450 thumper engine.">
 <style>
   html,body{margin:0;height:100%;background:#111;display:flex;align-items:center;justify-content:center}
   canvas{image-rendering:pixelated;background:#7ec8e3;width:min(100vw,177.78vh);height:auto}
   /* touch controls: shown only after a touch, hidden again on any key press */
   html,body{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+  canvas,#pad,.btn{touch-action:none}
   #pad{display:none}
   #pad.show{display:block}
   .btn{position:fixed;display:flex;align-items:center;justify-content:center;box-sizing:border-box;
@@ -90,6 +91,10 @@ function release(e) {
 addEventListener('pointerup', release);
 addEventListener('pointercancel', release);
 addEventListener('contextmenu', e => e.preventDefault());
+// iOS Safari ignores touch-action and user-scalable for double-tap and pinch zoom, and preventDefault on
+// pointer events does not stop them. Cancelling the touch and gesture events themselves does.
+for (const t of ['touchstart', 'touchmove', 'touchend', 'dblclick', 'gesturestart', 'gesturechange', 'gestureend'])
+  addEventListener(t, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 addEventListener('keydown', () => { if (TOUCH) { TOUCH = false; pad.classList.remove('show'); } });
 const go = () => TOUCH ? 'TAP' : 'SPACE';
 addEventListener('blur', () => {               // no stuck keys or buttons
